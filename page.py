@@ -1,5 +1,6 @@
 import streamlit as st
 from step import step
+from execute_step import Step
 from streamlit_flow import streamlit_flow
 from streamlit_flow.elements import StreamlitFlowNode
 from streamlit_flow.layouts import TreeLayout
@@ -8,23 +9,42 @@ from step import step, edges, nodes
 import numpy as np
 import cv2
 from quantize_color import quantize_color
+from data_types import ColorImage
+import typing
 
 @step
-def demo_func(i):
-    demo_func2(9)
+def load_image():
+    image = cv2.imread('quantized_mountain.png')
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = ColorImage(image)
+    return image
 
 @step
-def demo_func2(j):
-    pass
+def demo():
+    image = load_image()
+    quantize_color(image)
+
+def visualize_value(value: typing.Any):
+    if hasattr(value, 'visualize'):
+        value.visualize()
+    else:
+        st.write(value)
+
+def visualize_step(step: Step):
+    st.title('Input')
+    kwargs = list(step['kwargs'].items())
+    if kwargs:
+        tabs = st.tabs([k for k, _ in kwargs])
+        for i in range(len(kwargs)):
+            with tabs[i]:
+                visualize_value(kwargs[i][1])
+    else:
+        st.write('No Input')
+    st.title('Output')
+    st.write(step['result'])
 
 def main():
     st.set_page_config(layout="wide")
-
-    image = st.file_uploader("Upload an image", type=["jpg", "png", "jpeg"])
-    if image is None:
-        return
-    image = cv2.imdecode(np.frombuffer(image.read(), np.uint8), cv2.IMREAD_COLOR)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
 
     flow_key = cache.get_cache('flow_key')
     should_run = flow_key in st.session_state
@@ -42,12 +62,12 @@ def main():
             selected_node: StreamlitFlowNode = nodes[selected_id]
             st.markdown(selected_node.data['content'])
             if cache.has_cache(selected_id):
-                st.write(cache.get_cache(selected_id))
+                visualize_step(cache.get_cache(selected_id))
             else:
                 st.write('result not found')
     
     if should_run and not selected_id:
-        quantize_color(image)    
+        demo()
 
 if __name__ == "__main__":
     main()

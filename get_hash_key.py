@@ -1,7 +1,8 @@
 import hashlib
 import inspect
+from typing import Any, Callable, Dict, Tuple
 
-def get_hash_key(func, args, kwargs):
+def get_hash_key(func: Callable, args: Tuple[Any, ...], kwargs: Dict[str, Any]) -> Tuple[str, Dict[str, Any]]:
     """Generates a hash key based on function source code, arguments, and keyword arguments.
 
     Args:
@@ -10,7 +11,8 @@ def get_hash_key(func, args, kwargs):
         kwargs: Keyword arguments passed to the function.
 
     Returns:
-        str: A hash key string.
+        Tuple[str, Dict[str, Any]]: A tuple containing the hash key string and 
+               a dictionary of combined and filtered kwargs.
     """
     source_code = inspect.getsource(func)
 
@@ -21,4 +23,4 @@ def get_hash_key(func, args, kwargs):
     
     combined_data = source_code + str(filtered_kwargs)
 
-    return hashlib.md5(combined_data.encode()).hexdigest(), combined_kwargs
+    return hashlib.md5(combined_data.encode()).hexdigest(), filtered_kwargs

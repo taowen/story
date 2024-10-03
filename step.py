@@ -26,15 +26,20 @@ def rerun():
     cache.update_cache(flow_key=f'hackable_flow_{random.randint(0, 1000)}')
     st.rerun()
 
+def _format_node_content(func_name, **kwargs):
+    """Formats the content to be displayed in a node."""
+    content = f'# {func_name}\n'
+    content += '\n'.join([f"* {k}={v}" for k, v in kwargs.items()])
+    return content
+
 def step(func):
     @functools.wraps(func)
     def wrapper(*args, **kwargs):
         hash_key, kwargs = get_hash_key(func, args, kwargs)
         updated = False
         if hash_key not in nodes:
-            content = f'# {func.__name__}\n'
-            content += '\n'.join([f"* {k}={v}" for k, v in kwargs.items()])
-            nodes[hash_key] = StreamlitFlowNode(id=hash_key, pos=[0, 0], data={'content': content})
+            content = _format_node_content(func.__name__, **kwargs)
+            nodes[hash_key] = StreamlitFlowNode(id=hash_key, pos=(0, 0), data={'content': content})
             updated = True
         if stack:
             edge_key = f"{stack[-1]}->{hash_key}"
@@ -42,7 +47,6 @@ def step(func):
                 edges[edge_key] = StreamlitFlowEdge(edge_key, stack[-1], hash_key)
                 updated = True
         if updated:
-            print('re-run')
             rerun()
         stack.append(hash_key)
         try:

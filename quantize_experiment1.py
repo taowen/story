@@ -1,3 +1,10 @@
+from step import step
+import numpy as np
+import cv2
+from data_types import ColorImage
+import typing
+from visualize_steps import visualize_steps
+
 import cv2
 import numpy as np
 from typing import Dict
@@ -59,3 +66,21 @@ def get_dominant_color_in_mask(image_obj: ColorImage, mask_obj: ImageMask) -> tu
     dominant_color_mask = np.all(image == dominant_color, axis=-1).astype(np.uint8) * 255
     return RGB(dominant_color[0], dominant_color[1], dominant_color[2]), ImageMask(dominant_color_mask)
 
+@step
+def load_image():
+    image = cv2.imread('quantized_mountain.png')
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = ColorImage(image)
+    return image
+
+@step
+def demo():
+    image = load_image()
+    quantize_color(image)
+
+def main():
+    if visualize_steps():
+        demo()
+
+if __name__ == "__main__":
+    main()

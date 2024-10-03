@@ -1,28 +1,11 @@
 import streamlit as st
-from step import step
-from execute_step import Step
 from streamlit_flow import streamlit_flow
 from streamlit_flow.elements import StreamlitFlowNode
 from streamlit_flow.layouts import TreeLayout
 import cache
-from step import step, edges, nodes
-import numpy as np
-import cv2
-from quantize_color import quantize_color
-from data_types import ColorImage
+from step import edges, nodes
 import typing
-
-@step
-def load_image():
-    image = cv2.imread('quantized_mountain.png')
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    image = ColorImage(image)
-    return image
-
-@step
-def demo():
-    image = load_image()
-    quantize_color(image)
+from execute_step import Step
 
 def visualize_value(value: typing.Any):
     if hasattr(value, 'visualize'):
@@ -65,7 +48,7 @@ def visualize_step(step: Step):
     st.title('Output')
     visualize_value(step['result'])
 
-def main():
+def visualize_steps() -> bool:
     st.set_page_config(layout="wide")
 
     flow_key = cache.get_cache('flow_key')
@@ -88,8 +71,4 @@ def main():
             else:
                 st.write('result not found')
     
-    if should_run and not selected_id:
-        demo()
-
-if __name__ == "__main__":
-    main()
+    return should_run and not selected_id

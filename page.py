@@ -44,6 +44,18 @@ def visualize_value(value: typing.Any):
                 visualize_value(value[selected_key])
         else:
             st.write('empty dict')
+    elif isinstance(value, list):
+        if len(value) < 5:
+            tabs = st.tabs([f'[{i}] {v}' for i, v in enumerate(value)])
+            for i in range(len(value)):
+                with tabs[i]:
+                    visualize_value(value[i])
+        else:
+            selected_index = st.selectbox('Select index', [f'[{i}] {v}' for i, v in enumerate(value)])
+            selected_index = int(selected_index.split(' ')[0][1:-1])
+            visualize_value(value[selected_index])
+    elif isinstance(value, tuple):
+        visualize_value(list(value))
     else:
         st.write(value)
 

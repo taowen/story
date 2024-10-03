@@ -27,21 +27,31 @@ def demo():
 def visualize_value(value: typing.Any):
     if hasattr(value, 'visualize'):
         value.visualize()
+    elif isinstance(value, dict):
+        keys = {str(k): k for k, v in value.items()}
+        value = {str(k): v for k, v in value.items()}
+        kvs = list(value.items())
+        if kvs:
+            if len(kvs) < 5:
+                tabs = st.tabs([k for k, _ in kvs])
+                for i in range(len(kvs)):
+                    with tabs[i]:
+                        visualize_value(keys[kvs[i][0]])
+                        visualize_value(kvs[i][1])
+            else:
+                selected_key = st.selectbox('Select key', [k for k, _ in kvs])
+                visualize_value(keys[selected_key])
+                visualize_value(value[selected_key])
+        else:
+            st.write('empty dict')
     else:
         st.write(value)
 
 def visualize_step(step: Step):
     st.title('Input')
-    kwargs = list(step['kwargs'].items())
-    if kwargs:
-        tabs = st.tabs([k for k, _ in kwargs])
-        for i in range(len(kwargs)):
-            with tabs[i]:
-                visualize_value(kwargs[i][1])
-    else:
-        st.write('No Input')
+    visualize_value(step['kwargs'])
     st.title('Output')
-    st.write(step['result'])
+    visualize_value(step['result'])
 
 def main():
     st.set_page_config(layout="wide")

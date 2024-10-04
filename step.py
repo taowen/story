@@ -32,12 +32,13 @@ class StepEndEvent:
         self.result = result
         self.exception = exception
 
+thread_local = threading.local()
+
 def step(func: Callable) -> Callable:
     def wrapper(*args, **kwargs):
         # Generate a unique step_id
         step_id = get_next_step_id()
         
-        thread_local = threading.local()
         # Initialize the stack if it doesn't exist
         if not hasattr(thread_local, 'stack'):
             thread_local.stack = []

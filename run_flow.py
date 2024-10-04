@@ -94,7 +94,7 @@ def visualize_step(step: dict):
     if 'step_end_event' in step:
         if step['step_end_event'].exception:
             st.title('Failed')
-            st.write(step['step_end_event'].exception)
+            st.markdown(f'```\n{step["step_end_event"].exception}\n```')
         else:
             st.title('Output')
             visualize_value(step['step_end_event'].result)

@@ -2,6 +2,8 @@ import threading
 import queue
 from typing import Any, Callable, Tuple
 import flow_state
+import traceback
+import inspect
 
 if not flow_state.has_key('message_queue'):
     flow_state.update_key(message_queue = queue.Queue())
@@ -18,17 +20,17 @@ def get_next_step_id() -> str:
         return f's{step_counter}'
 
 class StepBeginEvent:
-    def __init__(self, step_id: str, func: Callable, args: Tuple, kwargs: dict, caller_step_id: str | None = None):
+    def __init__(self, step_id: str, func: Callable, kwargs: dict, caller_step_id: str | None = None):
         self.step_id = step_id
         self.func = func
-        self.args = args
         self.kwargs = kwargs
         self.caller_step_id = caller_step_id
 
 class StepEndEvent:
-    def __init__(self, step_id: str, result: Any):
+    def __init__(self, step_id: str, result: Any, exception: str):
         self.step_id = step_id
         self.result = result
+        self.exception = exception
 
 def step(func: Callable) -> Callable:
     def wrapper(*args, **kwargs):
@@ -44,17 +46,15 @@ def step(func: Callable) -> Callable:
         caller_step_id = thread_local.stack[-1] if thread_local.stack else None
         thread_local.stack.append(step_id)
         
-        # Capture the input arguments as a StepData object
-        message_queue.put(("step_begin", StepBeginEvent(step_id, func, args, kwargs, caller_step_id)))
-        
-        # Run the function and capture its output
-        output_data = func(*args, **kwargs)
-        
-        # Send input and output as separate messages to the main thread
-        message_queue.put(("step_end", StepEndEvent(step_id, output_data)))
-        
-        # Pop the step_id from the stack
-        thread_local.stack.pop()
-        
-        return output_data
+        combined_kwargs = {**dict(zip(inspect.getfullargspec(func).args, args)), **kwargs}
+        message_queue.put(("step_begin", StepBeginEvent(step_id, func, combined_kwargs, caller_step_id)))
+        try:        
+            result = func(**combined_kwargs)
+            message_queue.put(("step_end", StepEndEvent(step_id, result, '')))
+            return result
+        except:
+            message_queue.put(("step_end", StepEndEvent(step_id, None, traceback.format_exc())))
+            raise
+        finally:
+            thread_local.stack.pop()
     return wrapper

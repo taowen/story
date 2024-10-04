@@ -4,7 +4,7 @@ import time
 
 @step
 def example_function(a: int, b: int) -> int:
-    time.sleep(10)
+    time.sleep(3)
     return a + b
 
 def worker_thread():

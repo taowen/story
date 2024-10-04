@@ -38,15 +38,11 @@ def _format_node_content(func_name, **kwargs):
     return content
 
 def on_step_begin(event: StepBeginEvent):
-    func = event.func
-    args = event.args
     kwargs = event.kwargs
-    combined_kwargs = {**dict(zip(inspect.getfullargspec(func).args, args)), **kwargs}
-    content = _format_node_content(event.func.__name__, **combined_kwargs)
+    content = _format_node_content(event.func.__name__, **kwargs)
     nodes[event.step_id] = StreamlitFlowNode(id=event.step_id, pos=(0, 0), data={'content': content})
     steps[event.step_id] = {
-        'func': func, 
-        'kwargs': combined_kwargs
+        'step_begin_event': event
     }
     if event.caller_step_id:
         edge_key = f"{event.caller_step_id}->{event.step_id}"
@@ -55,7 +51,7 @@ def on_step_begin(event: StepBeginEvent):
     rerun()
 
 def on_step_end(event: StepEndEvent):
-    steps[event.step_id]['result'] = event.result
+    steps[event.step_id]['step_end_event'] = event
 
 def visualize_value(value: Any):
     if hasattr(value, 'visualize'):
@@ -94,11 +90,16 @@ def visualize_value(value: Any):
 
 def visualize_step(step: dict):
     st.title('Input')
-    visualize_value(step['kwargs'])
-    st.title('Output')
-    if 'result' in step:
-        visualize_value(step['result'])
+    visualize_value(step['step_begin_event'].kwargs)
+    if 'step_end_event' in step:
+        if step['step_end_event'].exception:
+            st.title('Failed')
+            st.write(step['step_end_event'].exception)
+        else:
+            st.title('Output')
+            visualize_value(step['step_end_event'].result)
     else:
+        st.title('Output')
         st.write('not end yet')
 
 def visualize_steps():

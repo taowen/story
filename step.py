@@ -1,71 +1,60 @@
-import streamlit as st
-from streamlit_flow.elements import StreamlitFlowNode, StreamlitFlowEdge
-from streamlit_flow.layouts import TreeLayout
-from get_hash_key import get_hash_key
-import cache
-import random
-import functools
-from execute_step import execute_step
+import threading
+import queue
+from typing import Any, Callable, Tuple
+import flow_state
 
-if not cache.has_cache('flow_key'):
-    cache.update_cache(flow_key='initial flow key')
+if not flow_state.has_key('message_queue'):
+    flow_state.update_key(message_queue = queue.Queue())
+message_queue = flow_state.get_key('message_queue')
 
-if not cache.has_cache('nodes'):
-    cache.update_cache(nodes={})
-nodes = cache.get_cache('nodes')
+# Initialize a thread-safe counter
+step_counter = 0
+counter_lock = threading.Lock()
 
-if not cache.has_cache('edges'):
-    cache.update_cache(edges={})
-edges = cache.get_cache('edges')
+def get_next_step_id() -> str:
+    global step_counter
+    with counter_lock:
+        step_counter += 1
+        return f's{step_counter}'
 
-if not cache.has_cache('stack'):
-    cache.update_cache(stack=[])
-stack = cache.get_cache('stack')
+class StepBeginEvent:
+    def __init__(self, step_id: str, func: Callable, args: Tuple, kwargs: dict, caller_step_id: str | None = None):
+        self.step_id = step_id
+        self.func = func
+        self.args = args
+        self.kwargs = kwargs
+        self.caller_step_id = caller_step_id
 
-def rerun():
-    flowkey = cache.get_cache('flow_key')
-    del st.session_state[flowkey]
-    cache.update_cache(flow_key=f'hackable_flow_{random.randint(0, 1000)}')
-    st.rerun()
+class StepEndEvent:
+    def __init__(self, step_id: str, result: Any):
+        self.step_id = step_id
+        self.result = result
 
-def _format_node_content(func_name, **kwargs):
-    """Formats the content to be displayed in a node."""
-    content = f'# {func_name}\n'
-    content += '\n'.join([f"* {k}={v}"[:200] for k, v in kwargs.items()])
-    return content
-
-def step(func):
-    @functools.wraps(func)
+def step(func: Callable) -> Callable:
     def wrapper(*args, **kwargs):
-        hash_key, kwargs = get_hash_key(func, args, kwargs)
-        updated = False
-        if hash_key not in nodes:
-            content = _format_node_content(func.__name__, **kwargs)
-            nodes[hash_key] = StreamlitFlowNode(id=hash_key, pos=(0, 0), data={'content': content})
-            updated = True
-        if stack:
-            edge_key = f"{stack[-1]}->{hash_key}"
-            if edge_key not in edges:
-                edges[edge_key] = StreamlitFlowEdge(edge_key, stack[-1], hash_key)
-                updated = True
-        if updated:
-            cache.update_cache(continue_step_data={
-                "func": func,
-                "args": args,
-                "kwargs": kwargs
-            })
-            rerun()
-        raise Exception('should not enter here')     
+        # Generate a unique step_id
+        step_id = get_next_step_id()
+        
+        thread_local = threading.local()
+        # Initialize the stack if it doesn't exist
+        if not hasattr(thread_local, 'stack'):
+            thread_local.stack = []
+        
+        # Push the current step_id onto the stack
+        caller_step_id = thread_local.stack[-1] if thread_local.stack else None
+        thread_local.stack.append(step_id)
+        
+        # Capture the input arguments as a StepData object
+        message_queue.put(("step_begin", StepBeginEvent(step_id, func, args, kwargs, caller_step_id)))
+        
+        # Run the function and capture its output
+        output_data = func(*args, **kwargs)
+        
+        # Send input and output as separate messages to the main thread
+        message_queue.put(("step_end", StepEndEvent(step_id, output_data)))
+        
+        # Pop the step_id from the stack
+        thread_local.stack.pop()
+        
+        return output_data
     return wrapper
-
-def continue_step():
-    data = cache.get_cache('continue_step_data')
-    hash_key, _ = get_hash_key(**data)
-    stack.append(hash_key)
-    try:
-        step_dict = execute_step(**data)
-        result = step_dict['result']
-        return result
-    finally:
-        stack.pop()
-    

@@ -48,11 +48,10 @@ def visualize_step(step: Step):
     st.title('Output')
     visualize_value(step['result'])
 
-def visualize_steps() -> bool:
+def visualize_steps():
     st.set_page_config(layout="wide")
 
     flow_key = cache.get_cache('flow_key')
-    should_run = flow_key in st.session_state
 
     # Create two columns
     col1, col2 = st.columns(2)
@@ -71,4 +70,3 @@ def visualize_steps() -> bool:
             else:
                 st.write('result not found')
     
-    return should_run and not selected_id

@@ -18,7 +18,9 @@ if not cache.has_cache('edges'):
     cache.update_cache(edges={})
 edges = cache.get_cache('edges')
 
-stack = []
+if not cache.has_cache('stack'):
+    cache.update_cache(stack=[])
+stack = cache.get_cache('stack')
 
 def rerun():
     flowkey = cache.get_cache('flow_key')
@@ -29,7 +31,7 @@ def rerun():
 def _format_node_content(func_name, **kwargs):
     """Formats the content to be displayed in a node."""
     content = f'# {func_name}\n'
-    content += '\n'.join([f"* {k}={v}" for k, v in kwargs.items()])
+    content += '\n'.join([f"* {k}={v}"[:200] for k, v in kwargs.items()])
     return content
 
 def step(func):
@@ -47,12 +49,23 @@ def step(func):
                 edges[edge_key] = StreamlitFlowEdge(edge_key, stack[-1], hash_key)
                 updated = True
         if updated:
+            cache.update_cache(continue_step_data={
+                "func": func,
+                "args": args,
+                "kwargs": kwargs
+            })
             rerun()
-        stack.append(hash_key)
-        try:
-            step_dict = execute_step(func, args, kwargs)
-            result = step_dict['result']
-            return result
-        finally:
-            stack.pop()       
+        raise Exception('should not enter here')     
     return wrapper
+
+def continue_step():
+    data = cache.get_cache('continue_step_data')
+    hash_key, _ = get_hash_key(**data)
+    stack.append(hash_key)
+    try:
+        step_dict = execute_step(**data)
+        result = step_dict['result']
+        return result
+    finally:
+        stack.pop()
+    

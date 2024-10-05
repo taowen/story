@@ -8,7 +8,7 @@ import inspect
 from streamlit_flow import streamlit_flow
 from streamlit_flow.elements import StreamlitFlowNode, StreamlitFlowEdge
 from streamlit_flow.layouts import TreeLayout
-from step import StepBeginEvent, StepEndEvent, message_queue
+from step import StepBeginEvent, StepEndEvent, message_queue, WorkerEndEvent, wrapped_worker_thread
 
 if not flow_state.has_key('flow_key'):
     flow_state.update_key(flow_key='initial flow key')
@@ -52,6 +52,10 @@ def on_step_begin(event: StepBeginEvent):
 
 def on_step_end(event: StepEndEvent):
     steps[event.step_id]['step_end_event'] = event
+
+def on_worker_end(event: WorkerEndEvent):
+    flow_state.update_key(worker_end_event=event)
+    rerun()
 
 def visualize_value(value: Any):
     if hasattr(value, 'visualize'):
@@ -104,7 +108,15 @@ def visualize_step(step: dict):
 
 def visualize_steps():
     st.set_page_config(layout="wide")
-
+    st.markdown("""
+        <style>
+        .stImage {
+            padding: 8px;
+            background-color: #d3d3d3;
+            display: inline-block;
+        }
+        </style>
+        """, unsafe_allow_html=True)
     flow_key = flow_state.get_key('flow_key')
 
     # Create two columns
@@ -120,10 +132,19 @@ def visualize_steps():
             selected_node: StreamlitFlowNode = nodes[selected_id]
             st.markdown(selected_node.data['content'])
             visualize_step(steps[selected_id])
-    
+        else:
+            if flow_state.has_key('worker_end_event'):
+                if flow_state.get_key('worker_end_event').exception:
+                    st.title('Worker Failed')
+                    st.markdown(f'```\n{flow_state.get_key("worker_end_event").exception}\n```')
+                else:
+                    st.write('worker finished')
+            else:
+                st.write('worker is still working')
+
 def run_flow(worker_thread: Callable):
     if not flow_state.has_key('worker'):
-        worker = threading.Thread(target=worker_thread)
+        worker = threading.Thread(target=lambda: wrapped_worker_thread(worker_thread))
         worker.start()
         flow_state.update_key(worker=worker)
 
@@ -136,6 +157,8 @@ def run_flow(worker_thread: Callable):
                 on_step_begin(event)
             elif message_type == "step_end":
                 on_step_end(event)
+            elif message_type == 'worker_end':
+                on_worker_end(event)
             else:
                 raise Exception(f'unknown event: {message_type}')
         except queue.Empty:

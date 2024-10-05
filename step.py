@@ -32,6 +32,10 @@ class StepEndEvent:
         self.result = result
         self.exception = exception
 
+class WorkerEndEvent:
+    def __init__(self, exception: str | None):
+        self.exception = exception
+
 thread_local = threading.local()
 
 def step(func: Callable) -> Callable:
@@ -59,3 +63,10 @@ def step(func: Callable) -> Callable:
         finally:
             thread_local.stack.pop()
     return wrapper
+
+def wrapped_worker_thread(worker_thread: Callable):
+    try:
+        worker_thread()
+        message_queue.put(("worker_end", WorkerEndEvent(None)))
+    except:
+        message_queue.put(("worker_end", WorkerEndEvent(traceback.format_exc())))

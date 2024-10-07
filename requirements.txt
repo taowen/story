@@ -3,3 +3,4 @@ Pillow
 scikit-learn
 streamlit-flow-component
 opencv-python
+numba
